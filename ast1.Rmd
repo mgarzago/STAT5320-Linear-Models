@@ -1,0 +1,153 @@
+---
+title: "STAT 5320 - Assignment 1"
+author: "Osmair Ansari, Mohammed Shaikh, Miguel Garza"
+output: word_document
+---
+
+### 1. Part 1: Electricity Consumption
+
+Merge and Load data from KAMLOOPS PRATT ROAD weather station.
+```{R}
+data = read.csv('merged_data.csv')
+data = data[-1,]
+colnames(data)
+```
+
+Checking for null values among all columns.
+  
+```{R}
+sapply(data, function(x) sum(is.null(x) | is.na(x)))
+```
+
+Eliminating unnecesary columns.
+
+```{R}
+data[c('Climate.ID', 'Date.Time', 'Year', 'Month', 'Day', 'Max.Temp.Flag', 'Min.Temp.Flag', 
+       'Mean.Temp.Flag', 'Heat.Deg.Days.Flag', 'Cool.Deg.Days.Flag', 'Total.Rain.Flag', 
+       'Total.Snow.Flag', 'Total.Precip.Flag', 'Snow.on.Grnd.Flag', 'Dir.of.Max.Gust.Flag', 
+       'Spd.of.Max.Gust.Flag', 'Data.Quality', 'Dir.of.Max.Gust..10s.deg.', 
+       'Spd.of.Max.Gust..km.h.')] = NULL
+```
+
+Dropping null rows.
+
+```{R}
+data = na.omit(data)
+```
+
+Our cleaned data size is:
+```{R}
+dim(data)
+```
+
+An overview of our data.
+
+```{R}
+head(data)
+```
+
+#### 1.1 Questions
+  1. For the purposes of this investigation, we are using the **Mean Temp (°C)** measurement as our outdoor temperature measurement.
+  2. Create a simple Linear Regression Model where the response is the consumption and the predictor is the temperature variable.
+
+     Present the equation of the line from your results and justify whether consumption increases, decreases, or is not significantly 
+     related to the outside temperature.
+
+        ```{R}
+        linear_model = lm(data$Net.Consumption..kWh. ~ data$Mean.Temp...C.)
+        slope = coef(linear_model)["data$Mean.Temp...C."]
+        intercept = coef(linear_model)["(Intercept)"]
+        cat("The equation of the line is: Net Consumption (kWh) =", round(slope, 2),
+            "* Mean Temp (°C)", "+", round(intercept, 2))
+        ```
+
+     The consumption decreases as the Mean Temperature increases.
+
+  3. Find the point estimate for the average electricity consumption when outside temperatures are -40C, -20C, 0C, 20C, 40C.
+
+        ```{R}
+        temperatures = c(-40, -20, 0, 20, 40)
+        predicted_consumption = function(temp){
+            consumption = slope*temp + intercept
+            return(consumption)
+        }
+        for(i in temperatures){
+            cat("Predicted consumption at", i, "°C:", round(predicted_consumption(i), 2), 
+                "kWh\n")
+        }
+        ```
+
+  4. Create a plot of the data and overlay the equation of the line. Just based on the graph, you'll likely feel unsatisfied. 
+     In a couple sentences, discuss whether which of the estimated values from the previous questions seem reasonable and which you feel unsatisfied with.
+
+        ```{R}
+        predicted_values = slope * temperatures + intercept
+        plot(data$Mean.Temp...C., data$Net.Consumption..kWh., xlab = "Mean Temp (°C)", 
+             ylab = "Net Consumption (kWh)",
+             xlim = c(-45, 45))
+        abline(linear_model, col = "red")
+        points(temperatures, predicted_values, col = "green", pch = 19)
+        grid()
+        ```
+     
+     The predicted values of the mean temperatures for -20, 0 and 20 °C seem reasonable enough when we compared them against the data points. However,
+     temperatures of -40 and 40 °C look completely disproportionate from the collected data.
+
+  5. As in lecture 2.2, create a new regression model with an additional term that does a better (but not necessarily the best) 
+     job to addresses your dissatifaction from the previous model.
+
+     a. Identify the equation of your new linear model.
+
+        ```{R}
+        linear_model_2 = lm(data$Net.Consumption..kWh. ~ data$Mean.Temp...C. + 
+                            I(data$Mean.Temp...C.^2))
+        b0 = coef(linear_model_2)["(Intercept)"]
+        b1 = coef(linear_model_2)["data$Mean.Temp...C."]
+        b2 = coef(linear_model_2)["I(data$Mean.Temp...C.^2)"]
+        cat("The equation of the line is:\nNet Consumption (kWh) =", round(b0, 2),
+            round(b1, 2), "* Mean Temp (°C)", "+", round(b2, 2), "* Mean Temp (°C) ^2")
+        ```
+
+     b. Very carefully use the regression model to answer the naïve question “does the resident uses more or less electricty when the 
+        outdoor temperature rises?”. Your answer should still be one sentence, or two short sentences.
+
+        
+
+  6. Estimate the average electricity use for -40,-20, 0, 20, 40C again, but with your new model. 
+     Discuss which provide better or worse estimates than the first model.
+
+        ```{R}
+        new_predicted_consumption = function(temp){
+            consumption = b0 + b1 * temp + b2 * (temp^2)
+            return(consumption)
+        }
+        for(i in temperatures){
+            cat("Predicted consumption at", i, "°C:", round(new_predicted_consumption(i), 2), 
+                "kWh\n")
+        }
+        ```
+
+      For temperatures 0 and 20 °C the expected consumption looks similar between both models. Interesting enough, 
+      for temperature -20 °C has a 17 unit differential between models and the second model provides a better approximation
+      of the consumption based on the datapoints. 
+
+      For temperatures -40 and 40 °C, it is hard to conlcude which model provides best predictions since we dont't have enough data
+      (at least not from a weather station in Kamloops) that can provide a visual of those temperatures. But given the tendency of
+      the points available we could argue that the second model still provides better estimates.
+
+  7. Create another scatterplot and this time overlay your new linear model. Clearly identify
+     your 5 estimated values and discuss whether the fit is better.
+
+        ```{R}
+        predicted_values = b0 + b1 * temperatures + b2 * (temperatures^2)
+        plot(data$Mean.Temp...C., data$Net.Consumption..kWh., xlab = "Mean Temp (°C)", 
+             ylab = "Net Consumption (kWh)",
+             xlim = c(-45, 45), ylim = c(0, 85))
+        curve(b0 + b1*x + b2*x^2, add = TRUE, col = "red", lwd = 2)
+        points(temperatures, predicted_values, col = "green", pch = 19)
+        grid()
+        ```
+     
+     Generally, the second model fits way better the data since we can clearly observe a non-linear relationship between the
+     Mean Temperature (°C) and the Net Consumption (kWh) as the firts model suggested. The second model provides more accurate
+     estimations thanks to the inclusion of a quadratic term transformation of the original predictor (Mean Temp).
